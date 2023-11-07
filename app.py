@@ -2,7 +2,7 @@ import os
 from flask import Flask, jsonify, request
 from flask_migrate import Migrate
 from dotenv import load_dotenv # funcion que me permite cargar las variables de entorno del archivo .env
-from models import db, User
+from models import db, User, Profile, Post
 
 load_dotenv()
 
@@ -37,12 +37,20 @@ def register():
     if not password:
         return jsonify({ "msg": "Password is required!"}), 400
     
+    userFound = User.query.filter_by(username=username).first()
+    if userFound:
+        return jsonify({ "msg": "Username already exists!"}), 400
+    
     user = User()
     user.username = username
     user.password = password
     
-    db.session.add(user)
-    db.session.commit()
+    #db.session.add(user)
+    #db.session.commit()
+    profile = Profile()
+    
+    user.profile = profile
+    user.save()
     
     return jsonify({ "msg": "Data completed"}), 200
 
@@ -51,8 +59,8 @@ def register():
 def get_or_create_user():
     
     if request.method == 'GET':
-        users = User.query.all()
-        users = list(map(lambda user: user.serialize(), users))
+        users = User.query.order_by(User.id.asc())
+        users = list(map(lambda user: user.datos_con_publicaciones(), users))
         return jsonify(users), 200
         
     if request.method == 'POST':
@@ -89,21 +97,52 @@ def get_update_or_delete_user(id):
     
     if request.method == 'PUT':
         
+        name = request.json.get("name")
+        lastname = request.json.get("lastname")
+        
         password = request.json.get("password")
         
         if not password:
             return jsonify({ "msg": "Password is required!"}), 400
         
+        if name:
+            # actualizamos los datos usando el relationship
+            user.profile.name = name
+        
+        if lastname:
+             # actualizamos los datos usando el relationship
+            user.profile.lastname = lastname
+            
         user.password = password
-        db.session.commit()
+        #db.session.commit()
+        user.update()
         
         return jsonify(user.serialize()), 200
     
     if request.method == 'DELETE':
-        db.session.delete(user)
-        db.session.commit()
+        #db.session.delete(user)
+        #db.session.commit()
+        
+        user.delete() # eliminamos el usuario con la funcion delete creada en el modelo (User)
+        
         return jsonify({ "result": "User deleted!"}), 200
 
+
+@app.route('/posts', methods=['POST'])
+def agregar_post():
+    
+    title = request.json.get("title")
+    users_id = request.json.get("users_id")
+    
+    post = Post()
+    post.title = title 
+    post.users_id = users_id
+    
+    post.save()
+    
+    return jsonify(post.serialize()), 201    
+    
+    
 """ @app.route('/users/<int:id>', methods=['PUT'])
 def update_user(id):
     
